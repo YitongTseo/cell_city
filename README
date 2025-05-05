@@ -4,3 +4,11 @@ Looking for go-basic.json
 The International Standard Classification of Occupations- ISCO-08
 Downloaded here:
 https://isco-ilo.netlify.app/en/isco-08/ 
+
+
+
+Or use the GO ontology's own interactive tree:
+https://amigo.geneontology.org/amigo/dd_browse
+
+This helps me narrow down to only human genes...
+https://current.geneontology.org/products/pages/downloads.html
