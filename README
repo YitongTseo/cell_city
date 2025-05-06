@@ -12,3 +12,16 @@ https://amigo.geneontology.org/amigo/dd_browse
 
 This helps me narrow down to only human genes...
 https://current.geneontology.org/products/pages/downloads.html
+
+Ollama download:
+https://ollama.com/download 
+
+
+(cell_city) yitongtseo@C02GD03WMD6P cell_city % /Users/yitongtseo/Documents/GitHub/cell_city/Ollama.app/Contents/MacOS/Ollama --install
+
+/Ollama.app/Contents/MacOS/Ollama run llama3.2 
+or pip install ollama
+
+ollama run llama3.2 <-- I guess we're using 3.2 after all.. 
+
+<!-- https://ollama.com/library/phi4-mini -->
