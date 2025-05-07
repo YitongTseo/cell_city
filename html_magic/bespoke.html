@@ -1,0 +1,164 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Editable GO Tree</title>
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/jstree@3.3.12/dist/themes/default/style.min.css" />
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      background-color: #f4f4f9;
+      color: #333;
+      margin: 2em;
+    }
+    #tree-container {
+      max-width: 900px;
+      margin: auto;
+      background: white;
+      padding: 1em;
+      border-radius: 10px;
+      box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+    }
+    button {
+      background: #007acc;
+      color: white;
+      border: none;
+      padding: 0.5em 1em;
+      margin: 0.5em 0.5em 1em 0;
+      border-radius: 5px;
+      cursor: pointer;
+    }
+    button:hover {
+      background: #005fa3;
+    }
+    textarea {
+      width: 100%;
+      height: 200px;
+      font-family: monospace;
+      background: #f0f0f0;
+      padding: 1em;
+      border-radius: 5px;
+    }
+    #meta_panel {
+      margin-top: 20px;
+      background: #e6f3ff;
+      border-left: 5px solid #007acc;
+      padding: 1em;
+      border-radius: 5px;
+    }
+    #meta_panel label {
+      font-weight: bold;
+    }
+    #meta_panel input, #meta_panel textarea {
+      width: 100%;
+      padding: 0.5em;
+      margin-bottom: 1em;
+      border-radius: 4px;
+      border: 1px solid #ccc;
+    }
+  </style>
+</head>
+<body>
+
+<div id="tree-container">
+  <div id="go_tree"></div>
+  <button onclick="enableEditing()">Enable Edit Mode</button>
+  <button onclick="saveTree()">Save to JSON</button>
+  
+  <div id="meta_panel" style="display: none;">
+    <h3>Edit Node Metadata</h3>
+    <label>Label</label>
+    <input id="meta_label" />
+    <label>Definition</label>
+    <textarea id="meta_definition"></textarea>
+    <label>Job Suggestion</label>
+    <input id="meta_job" />
+    <label>Parents (comma-separated IDs)</label>
+    <input id="meta_parents" />
+    <button onclick="updateMetadata()">Save Metadata</button>
+  </div>
+
+  <textarea id="output" placeholder="Edited JSON will appear here..."></textarea>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/jquery@3.6.0/dist/jquery.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/jstree@3.3.12/dist/jstree.min.js"></script>
+
+<script>
+  let currentNode = null;
+  let rawGraph = null;
+
+  async function loadAndRenderTree() {
+    const response = await fetch('html_ready_human_go_tree.json');
+    const treeData = await response.json();
+
+    $('#go_tree').jstree({
+      core: {
+        check_callback: true,
+        data: treeData
+      },
+      plugins: ["dnd", "contextmenu", "types", "unique"]
+    });
+  }
+
+  function buildJsTreeData(graph) {
+    const nodeMap = {};
+    graph.nodes.forEach(n => nodeMap[n.id] = { ...n, children: [] });
+
+    graph.links.forEach(link => {
+      const src = link.source;
+      const tgt = link.target;
+      if (!nodeMap[src]) nodeMap[src] = { id: src, label: src, children: [] };
+      if (!nodeMap[tgt]) nodeMap[tgt] = { id: tgt, label: tgt, children: [] };
+      nodeMap[src].children.push(nodeMap[tgt]);
+    });
+
+    const allTargets = new Set(graph.links.map(l => l.target));
+    const roots = Object.values(nodeMap).filter(n => !allTargets.has(n.id));
+
+    function transform(node) {
+      return {
+        id: node.id,
+        text: node.label,
+        data: {
+          definition: node.definition || "",
+          parents: node.parents || [],
+          job_suggestion: node.job_suggestion || ""
+        },
+        children: node.children?.map(transform) || []
+      };
+    }
+
+    return roots.map(transform);
+  }
+
+  function enableEditing() {
+    $('#go_tree').jstree(true).settings.core.check_callback = true;
+    $('#go_tree').jstree(true).refresh();
+    alert("Edit mode enabled! You can drag, rename, or delete.");
+  }
+
+  function updateMetadata() {
+    if (!currentNode) return;
+
+    currentNode.text = document.getElementById('meta_label').value;
+    currentNode.data = {
+      definition: document.getElementById('meta_definition').value,
+      job_suggestion: document.getElementById('meta_job').value,
+      parents: document.getElementById('meta_parents').value.split(',').map(s => s.trim())
+    };
+
+    $('#go_tree').jstree(true).rename_node(currentNode, currentNode.text);
+  }
+
+  function saveTree() {
+    const treeInstance = $('#go_tree').jstree(true);
+    const json = treeInstance.get_json('#', { flat: false });
+    document.getElementById('output').value = JSON.stringify(json, null, 2);
+  }
+
+  loadAndRenderTree();
+</script>
+
+</body>
+</html>

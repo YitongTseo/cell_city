@@ -25,3 +25,8 @@ or pip install ollama
 ollama run llama3.2 <-- I guess we're using 3.2 after all.. 
 
 <!-- https://ollama.com/library/phi4-mini -->
+
+
+RUN THIS:
+python3 -m http.server <-- to see the bespoke.html
+THEN GO TO:
