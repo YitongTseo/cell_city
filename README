@@ -30,3 +30,4 @@ ollama run llama3.2 <-- I guess we're using 3.2 after all..
 RUN THIS:
 python3 -m http.server <-- to see the bespoke.html
 THEN GO TO:
+http://localhost:8000/html_magic/bespoke.html

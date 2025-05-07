@@ -11,13 +11,47 @@
       color: #333;
       margin: 2em;
     }
-    #tree-container {
-      max-width: 900px;
+    .main-layout {
+      display: flex;
+      max-width: 1200px;
       margin: auto;
+      gap: 20px;
+    }
+    .left-panel {
+      flex: 1;
       background: white;
       padding: 1em;
       border-radius: 10px;
       box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+      min-width: 400px;
+    }
+    .right-panel {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+    }
+    #meta_panel {
+      background: #e6f3ff;
+      border-left: 5px solid #007acc;
+      padding: 1em;
+      border-radius: 5px;
+      margin-bottom: 20px;
+      box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+    }
+    #json_panel {
+      background: white;
+      padding: 1em;
+      border-radius: 5px;
+      box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+      flex-grow: 1;
+    }
+    #tree-container {
+      width: 100%;
+    }
+    #go_tree {
+      max-height: 70vh;
+      overflow: auto;
+      margin-bottom: 20px;
     }
     button {
       background: #007acc;
@@ -36,13 +70,6 @@
       height: 200px;
       font-family: monospace;
       background: #f0f0f0;
-      padding: 1em;
-      border-radius: 5px;
-    }
-    #meta_panel {
-      margin-top: 20px;
-      background: #e6f3ff;
-      border-left: 5px solid #007acc;
       padding: 1em;
       border-radius: 5px;
     }
@@ -67,47 +94,68 @@
       margin: 10px 0;
       border-radius: 5px;
       display: none;
+      position: fixed;
+      top: 20px;
+      right: 20px;
+      z-index: 1000;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.2);
     }
     .success {
       background-color: #d4edda;
       color: #155724;
       border: 1px solid #c3e6cb;
     }
+    .error {
+      background-color: #f8d7da;
+      color: #721c24;
+      border: 1px solid #f5c6cb;
+    }
+    .node-selected {
+      background-color: #e6f3ff !important;
+    }
   </style>
 </head>
 <body>
 
-<div id="tree-container">
-  <h1>GO Tree Editor</h1>
-  <p>Click on a node to edit its metadata including job suggestions. Changes will be reflected in the JSON output.</p>
-  
-  <div id="go_tree"></div>
-  
-  <button onclick="enableEditing()">Enable Edit Mode</button>
-  <button onclick="saveTree()">Save to JSON</button>
-  <button onclick="downloadJSON()">Download JSON</button>
-  
-  <div id="status-message" class="status-message"></div>
-  
-  <div id="meta_panel" style="display: none;">
-    <h3>Edit Node Metadata</h3>
-    <label for="meta_label">Label:</label>
-    <input id="meta_label" />
-    
-    <label for="meta_definition">Definition:</label>
-    <textarea id="meta_definition"></textarea>
-    
-    <label for="meta_job">Job Suggestion:</label>
-    <textarea id="meta_job"></textarea>
-    
-    <label for="meta_parents">Parents (comma-separated IDs):</label>
-    <input id="meta_parents" />
-    
-    <button onclick="updateMetadata()">Save Metadata</button>
-  </div>
+<div id="status-message" class="status-message"></div>
 
-  <h3>JSON Output</h3>
-  <textarea id="output" placeholder="Edited JSON will appear here..."></textarea>
+<h1>GO Tree Editor</h1>
+<p>Click on a node to edit its metadata including job suggestions. Changes will be automatically saved.</p>
+
+<div class="main-layout">
+  <div class="left-panel">
+    <div id="go_tree"></div>
+    <button onclick="enableEditing()">Enable Edit Mode</button>
+    <button onclick="saveTree()">Update JSON</button>
+    <button onclick="saveToFile()">Save to File</button>
+  </div>
+  
+  <div class="right-panel">
+    <div id="meta_panel" style="display: none;">
+      <h3>Edit Node: <span id="current_node_label"></span></h3>
+      
+      <label for="meta_label">Label:</label>
+      <input id="meta_label" />
+      
+      <label for="meta_job">Job Suggestion:</label>
+      <textarea id="meta_job"></textarea>
+      
+      <label for="meta_definition">Definition:</label>
+      <textarea id="meta_definition"></textarea>
+      
+      <label for="meta_parents">Parents (comma-separated IDs):</label>
+      <input id="meta_parents" />
+      
+      <button onclick="updateMetadata()">Save Changes</button>
+    </div>
+    
+    <div id="json_panel">
+      <h3>JSON Output</h3>
+      <textarea id="output" placeholder="Edited JSON will appear here..."></textarea>
+      <button onclick="downloadJSON()">Download JSON</button>
+    </div>
+  </div>
+</div>
 </div>
 
 <script src="https://cdn.jsdelivr.net/npm/jquery@3.6.0/dist/jquery.min.js"></script>
@@ -117,26 +165,40 @@
   let currentNode = null;
   let rawGraph = null;
 
+  let treeFileName = 'html_ready_human_go_tree.json';
+  let originalTreeData = null;
+  
   async function loadAndRenderTree() {
     try {
-      const response = await fetch('html_ready_human_go_tree.json');
+      const response = await fetch(treeFileName);
       const treeData = await response.json();
+      originalTreeData = treeData; // Store the original data
       
       $('#go_tree').jstree({
         core: {
           check_callback: true,
-          data: treeData
+          data: treeData,
+          themes: {
+            responsive: true,
+            variant: "large"
+          }
         },
-        plugins: ["dnd", "contextmenu", "types", "unique"]
+        plugins: ["dnd", "contextmenu", "types", "unique", "wholerow"]
       });
       
       // Set up event listeners after tree is loaded
       $('#go_tree').on('select_node.jstree', function (e, data) {
         currentNode = data.node;
         showMetadataPanel(currentNode);
+        
+        // Highlight the selected node
+        $('.jstree-wholerow-clicked').addClass('node-selected');
       });
       
       showStatusMessage("Tree loaded successfully!", "success");
+      
+      // Auto-save initial JSON
+      setTimeout(saveTree, 1000);
     } catch (error) {
       console.error("Error loading tree data:", error);
       showStatusMessage("Error loading tree data. Check console for details.", "error");
@@ -144,12 +206,20 @@
   }
 
   function showMetadataPanel(node) {
+    // Update the node label in the panel heading
+    document.getElementById('current_node_label').textContent = node.text;
+    
+    // Populate form fields
     document.getElementById('meta_label').value = node.text || '';
     document.getElementById('meta_definition').value = node.data?.definition || '';
     document.getElementById('meta_job').value = node.data?.job_suggestion || '';
     document.getElementById('meta_parents').value = (node.data?.parents || []).join(', ');
     
+    // Show the panel if it's hidden
     document.getElementById('meta_panel').style.display = 'block';
+    
+    // Add a focus effect
+    document.getElementById('meta_job').focus();
   }
 
   function enableEditing() {
@@ -197,7 +267,7 @@
     processNodeDataForOutput(json);
     
     document.getElementById('output').value = JSON.stringify(json, null, 2);
-    showStatusMessage("Tree saved to JSON output!", "success");
+    showStatusMessage("JSON updated!", "success");
   }
   
   function processNodeDataForOutput(nodes) {
@@ -240,6 +310,53 @@
     URL.revokeObjectURL(url);
     
     showStatusMessage("JSON downloaded successfully!", "success");
+  }
+  
+  // Function to attempt saving directly to the file system
+  function saveToFile() {
+    saveTree(); // Make sure JSON is updated
+    
+    const jsonString = document.getElementById('output').value;
+    
+    // Check if the File System Access API is supported
+    if ('showSaveFilePicker' in window) {
+      saveWithFilePicker(jsonString);
+    } else {
+      // Fallback to download
+      downloadJSON();
+      showStatusMessage("Direct file saving not supported in this browser. File downloaded instead.", "warning");
+    }
+  }
+  
+  async function saveWithFilePicker(jsonString) {
+    try {
+      // Show file picker
+      const fileHandle = await window.showSaveFilePicker({
+        suggestedName: treeFileName,
+        types: [{
+          description: 'JSON File',
+          accept: {'application/json': ['.json']},
+        }],
+      });
+      
+      // Create a writable stream
+      const writable = await fileHandle.createWritable();
+      
+      // Write the file
+      await writable.write(jsonString);
+      await writable.close();
+      
+      // Update the filename for future saves
+      treeFileName = fileHandle.name;
+      
+      showStatusMessage(`File saved successfully as ${treeFileName}!`, "success");
+    } catch (err) {
+      console.error("Error saving file:", err);
+      showStatusMessage("Error saving file. " + err.message, "error");
+      
+      // Fallback to download if there was an error
+      downloadJSON();
+    }
   }
   
   function showStatusMessage(message, type) {
